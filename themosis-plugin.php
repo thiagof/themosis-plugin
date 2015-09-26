@@ -32,23 +32,29 @@ if (!class_exists('THFWK_ThemosisPlugin'))
     class THFWK_ThemosisPlugin
     {
         /**
-         * Plugin class instance.
+         * Theme class instance.
          *
          * @var \THFWK_ThemosisPlugin
          */
-        private static $instance = null;
+        protected static $instance = null;
         
         /**
          * Switch that tell if core and datas plugins are loaded.
          *
          * @var bool
          */
-        private $pluginsAreLoaded = false;
-
-        private function __construct()
+        protected $pluginsAreLoaded = false;
+        protected function __construct()
         {
+            // Default path to Composer autoload file.
+            $autoload = __DIR__.DS.'vendor'.DS.'autoload.php';
+            // Check for autoload file in dev mode (vendor loaded into the theme)
+            if (file_exists($autoload))
+            {
+                require($autoload);
+            }
             // Check if framework is loaded.
-            add_action('after_setup_theme', array($this, 'check'));
+            add_action('after_setup_theme', [$this, 'check']);
         }
         
         /**
@@ -73,27 +79,16 @@ if (!class_exists('THFWK_ThemosisPlugin'))
          */
         public function check()
         {
-            $symfony = class_exists('Symfony\Component\ClassLoader\ClassLoader');
-            $themosis = class_exists('THFWK_Themosis');
-
-            // Symfony dependency and Themosis plugin classes are available.
-            if ($symfony && $themosis)
+            // Check if core application class is loaded...
+            if (!class_exists('Themosis\Core\Application'))
             {
-                $this->pluginsAreLoaded = $themosis;
-            }
-
-            // Display a message to the user in the admin panel when he's activating the theme
-            // if the plugin is not available.
-            if (!$themosis)
-            {
-                add_action('admin_notices', array($this, 'displayMessage'));
-                return;
-            }
-
-            // Display a message if Symfony Class Loader component is not available.
-            if (!$symfony)
-            {
-                add_action('admin_notices', array($this, 'displayNotice'));
+                // Message for the back-end
+                add_action('admin_notices', [$this, 'displayMessage']);
+                // Message for the front-end
+                if (!is_admin())
+                {
+                    wp_die(__("The <strong>Themosis theme</strong> can't work properly. Please make sure the Themosis framework plugin is installed. Check also your <strong>composer.json</strong> autoloading configuration.", THEMOSIS_THEME_TEXTDOMAIN));
+                }
                 return;
             }
         }
@@ -107,33 +102,9 @@ if (!class_exists('THFWK_ThemosisPlugin'))
         {
             ?>
                 <div id="message" class="error">
-                    <p><?php _e("You first need to activate the <b>Themosis framework</b> in order to use this theme.", THEMOSIS_PLUGIN_TEXTDOMAIN); ?></p>
+                    <p><?php _e("You first need to activate the <b>Themosis framework</b> in order to use this theme.", THEMOSIS_THEME_TEXTDOMAIN); ?></p>
                 </div>
             <?php
-        }
-
-        /**
-         * Display a notice to the user if the Symfony class loaded is not available.
-         *
-         * @return void
-         */
-        public function displayNotice()
-        {
-        ?>
-            <div id="message" class="error">
-                <p><?php _e(sprintf('<b>Themosis plugin:</b> %s', "Symfony Class Loader component not found. Make sure the Themosis plugin includes it before proceeding."), THEMOSIS_PLUGIN_TEXTDOMAIN); ?></p>
-            </div>
-        <?php
-        }
-        
-        /**
-         * Return true if framework is loaded.
-         *
-         * @return boolean
-         */
-        public function isPluginLoaded()
-        {
-            return $this->pluginsAreLoaded;
         }
     }
 }
@@ -157,170 +128,18 @@ if (!function_exists('themosisPlugin_setApplicationPaths'))
         $paths['base'] = __DIR__.DS;
 
         // Application path.
-        $paths['app'] = __DIR__.DS.'app'.DS;
-
+        $paths['plugin'] = __DIR__.DS.'resources'.DS;
+        
         // Application admin directory.
-        $paths['admin'] = __DIR__.DS.'app'.DS.'admin'.DS;
+        $paths['admin'] = __DIR__.DS.'resources'.DS.'admin'.DS;
 
         // Application storage directory.
-        $paths['storage'] = __DIR__.DS.'app'.DS.'storage'.DS;
-
+        $paths['storage'] = __DIR__.DS.'storage'.DS;
         return $paths;
     }
 }
 
 /*----------------------------------------------------*/
-// Set plugins's configurations.
+// Start the plugin.
 /*----------------------------------------------------*/
-add_action('themosis_configurations', function()
-{
-    Themosis\Configuration\Config::make(array(
-        'app'    => array(
-            'application',
-            'constants',
-            'images',
-            'loading',
-            'menus',
-            'sidebars',
-            'supports',
-            'templates'
-        )
-    ));
-
-   Themosis\Configuration\Config::set();
-});
-
-/*----------------------------------------------------*/
-// Register plugin view paths.
-/*----------------------------------------------------*/
-add_filter('themosisViewPaths', function($paths)
-{
-    $paths[] = themosis_path('app').'views'.DS;
-    return $paths;
-});
-
-/*----------------------------------------------------*/
-// Register plugins asset paths.
-/*----------------------------------------------------*/
-add_filter('themosisAssetPaths', function($paths)
-{
-    $paths[THEMOSIS_ASSETS] = themosis_path('app').'assets';
-    return $paths;
-});
-
-/*----------------------------------------------------*/
-// Bootstrap plugin.
-/*----------------------------------------------------*/
-add_action('themosis_bootstrap', function()
-{
-    /*----------------------------------------------------*/
-    // Handle errors, warnings, exceptions.
-    /*----------------------------------------------------*/
-    set_exception_handler(function($e)
-    {
-        Themosis\Error\Error::exception($e);
-    });
-
-    set_error_handler(function($code, $error, $file, $line)
-    {
-        // Check if the class exists
-        // Otherwise WP can't find it when
-        // constructing its "Menus" page
-        // under appearance in administration.
-        if (class_exists('Themosis\Error\Error'))
-        {
-            Themosis\Error\Error::native($code, $error, $file, $line);
-        }
-    });
-
-    if (defined('THEMOSIS_ERROR_SHUTDOWN') && THEMOSIS_ERROR_SHUTDOWN)
-    {
-        register_shutdown_function(function()
-        {
-            Themosis\Error\Error::shutdown();
-        });
-    }
-
-    // Passing in the value -1 will show every errors.
-    $report = defined('THEMOSIS_ERROR_REPORT') ? THEMOSIS_ERROR_REPORT : 0;
-    error_reporting($report);
-
-    /*----------------------------------------------------*/
-    // Set class aliases.
-    /*----------------------------------------------------*/
-    $aliases = Themosis\Configuration\Application::get('aliases');
-
-    foreach ($aliases as $namespace => $className)
-    {
-        class_alias($namespace, $className);
-    }
-
-    /*----------------------------------------------------*/
-    // Application textdomain.
-    /*----------------------------------------------------*/
-    defined('THEMOSIS_TEXTDOMAIN') ? THEMOSIS_TEXTDOMAIN : define('THEMOSIS_TEXTDOMAIN', Themosis\Configuration\Application::get('textdomain'));
-
-    /*----------------------------------------------------*/
-    // Trigger framework default configuration.
-    /*----------------------------------------------------*/
-    Themosis\Configuration\Configuration::make();
-
-    /*----------------------------------------------------*/
-    // Application constants.
-    /*----------------------------------------------------*/
-    Themosis\Configuration\Constant::load();
-
-    /*----------------------------------------------------*/
-    // Application page templates.
-    /*----------------------------------------------------*/
-    Themosis\Configuration\Template::init();
-
-    /*----------------------------------------------------*/
-    // Application image sizes.
-    /*----------------------------------------------------*/
-    Themosis\Configuration\Images::install();
-
-    /*----------------------------------------------------*/
-    // Parse application files and include them.
-    // Extends the 'functions.php' file by loading
-    // files located under the 'admin' folder.
-    /*----------------------------------------------------*/
-    Themosis\Core\AdminLoader::add();
-    Themosis\Core\WidgetLoader::add();
-
-    /*----------------------------------------------------*/
-    // Application widgets.
-    /*----------------------------------------------------*/
-    Themosis\Core\WidgetLoader::load();
-
-    /*----------------------------------------------------*/
-    // Application global JS object.
-    /*----------------------------------------------------*/
-    Themosis\Ajax\Ajax::set();
-});
-
-/*----------------------------------------------------*/
-// Handle application requests/responses.
-/*----------------------------------------------------*/
-function themosisPlugin_start_app()
-{
-    if (THFWK_ThemosisPlugin::getInstance()->isPluginLoaded())
-    {
-        do_action('themosis_parse_query', $arg = '');
-
-        /*----------------------------------------------------*/
-        // Application routes.
-        /*----------------------------------------------------*/
-        require themosis_path('app').'routes.php';
-
-        /*----------------------------------------------------*/
-        // Run application and return a response.
-        /*----------------------------------------------------*/
-        do_action('themosis_run');
-    }
-    else
-    {
-        _e("The plugin won't work until you install the Themosis framework plugin correctly.", THEMOSIS_PLUGIN_TEXTDOMAIN);
-    }
-}
-add_action( 'template_redirect', 'themosisPlugin_start_app' );
+require_once('bootstrap'.DS.'start.php');

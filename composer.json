@@ -1,0 +1,26 @@
+{
+    "name": "themosis/plugin",
+    "description": "The Themosis framework plugin.",
+    "keywords": ["themosis", "framework", "WordPress", "plugin"],
+    "license": "GPL-2.0+",
+    "authors":[
+        {
+            "name": "Julien Lambé",
+            "email": "julien@themosis.com",
+            "homepage": "http://www.themosis.com/"
+        }
+    ],
+    "autoload": {
+        "psr-4": {
+            "": ["resources/controllers/", "resources/models"]
+        }
+    },
+    "type": "wordpress-plugin",
+    "require": {
+        "php": ">=5.4",
+        "composer/installers" : "~1.0"
+    },
+    "require-dev":{
+        "php": ">=5.4"
+    }
+}
