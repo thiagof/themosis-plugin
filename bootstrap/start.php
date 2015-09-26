@@ -215,7 +215,7 @@ function themosisPlugin_start_app()
     /*----------------------------------------------------*/
     // Application routes.
     /*----------------------------------------------------*/
-    require themosis_path('theme').'routes.php';
+    require themosis_path('plugin').'routes.php';
 
     /*----------------------------------------------------*/
     // Run application and return a response.
