@@ -323,3 +323,4 @@ function themosisPlugin_start_app()
         _e("The plugin won't work until you install the Themosis framework plugin correctly.", THEMOSIS_PLUGIN_TEXTDOMAIN);
     }
 }
+add_action( 'template_redirect', 'themosisPlugin_start_app' );
